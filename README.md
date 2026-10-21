@@ -12,7 +12,7 @@
 ## 交付物对照
 | 交付 | 位置 |
 |------|------|
-| 交付1 源码 + 修改说明 + 依赖/配置 + 测试数据 | `src/`、`tests/`、`fixtures/`、`CHANGELOG.md`、`package.json` |
+| 交付1 源码 + 修改说明 + 依赖/配置 + 测试数据 | `src/`、`tests/`、`CHANGELOG.md`、`package.json` |
 | 交付2 运行说明 | 本 `README.md` |
 | 交付3 验收记录 | `ACCEPTANCE.md`（由 `tests/integration-test/run-all.js` 与 `tests/e2e-test/e2e-cli.js` 输出佐证） |
 | 交付4 设计说明 | `DESIGN.md`（+ `specs/spec.md` 规格定稿） |
@@ -28,7 +28,6 @@
 # 1) 初始化 / 重建数据库（单一 data/db.json，MySQL 式关系表，按 user_id 隔离）
 npm run init          # 不存在则创建空库
 npm run reset         # 清空重建（重复测试前先跑，保证互不串扰）
-npm run seed -- fixtures/sample.json   # 用虚构样例事实重建库
 
 # 2) 处理某个用户的数据（--user 强制，用于隔离与授权）
 node src/cli.js set-now --at "2026-10-01 09:00" --user alice
@@ -40,7 +39,7 @@ node src/cli.js report --user alice
 # 3) 运行验收与测试
 npm run scenarios     # node tests/integration-test/run-all.js：进程内直调服务层，10 个场景，打印 预期/实际/PASS-FAIL
 npm run e2e           # node tests/e2e-test/e2e-cli.js：真·端到端，逐条 spawn CLI 子进程跑完 10 场景
-npm test              # node --test tests/unit-test：单元测试（配对/退款/提醒/幂等/引擎，24 项）
+npm test              # node --test（自动发现 tests/unit-test/*.test.js）：单元测试（配对/退款/提醒/幂等/引擎，24 项）
 
 # 4) 带旁白演示（正常/异常/核验/控制/诚实/重启）
 npm run demo
@@ -52,7 +51,6 @@ npm run demo
 | 命令 | 作用 |
 |------|------|
 | `init` / `reset` | 建立 / 清空重建单一 `data/db.json` |
-| `seed <fixture.json>` | 由脚本 `scripts/init-db.js` 提供：`node scripts/init-db.js seed <file>` |
 | `set-now --at "YYYY-MM-DD HH:mm"` | 设置该用户模拟时钟基准（北京时间） |
 | `advance <时长>` | 推进模拟时长（`30m`/`24h`/`2d`/毫秒），推进后自动自检 |
 | `ingest-tx --id --merchant --amount --at` | 导入一笔交易（按 `tx_id` 幂等） |
@@ -233,7 +231,7 @@ node src/cli.js list --user u10
 ## 目录结构
 ```
 bill/
-├─ package.json                 # 工程配置（ESM）与脚本命令（init/reset/seed/demo/scenarios/e2e/unit-test/integration-test/e2e-test/test）
+├─ package.json                 # 工程配置（ESM）与脚本命令（init/reset/demo/scenarios/e2e/unit-test/integration-test/e2e-test/test）
 ├─ README.md                    # 运行说明（交付2）
 ├─ DESIGN.md                    # 设计说明（交付4）
 ├─ ACCEPTANCE.md                # 验收记录（交付3，由 tests/integration-test/run-all.js 与 tests/e2e-test/e2e-cli.js 输出佐证）
@@ -271,7 +269,7 @@ bill/
 │     ├─ messaging.js           # 模拟提醒发送（不做真实消息）
 │     └─ queryService.js        # list/show/report 查询
 ├─ scripts/
-│  ├─ init-db.js                # init / reset / seed 数据库脚本
+│  ├─ init-db.js                # init / reset 数据库脚本
 │  └─ demo.js                   # 带旁白演示（正常/异常/核验/控制/诚实/重启）
 ├─ tests/                       # 全部测试（三层，按类型分子目录）
 │  ├─ unit-test/                # 单元测试（npm test → node --test 自动发现 *.test.js）
@@ -285,8 +283,6 @@ bill/
 │  │  └─ run-all.js             # 依次执行全部场景
 │  └─ e2e-test/                 # 真·端到端（npm run e2e）
 │     └─ e2e-cli.js             # 逐条 spawn CLI 子进程复现 10 场景（零依赖 src/）
-├─ fixtures/
-│  └─ sample.json               # 虚构样例事实（seed 数据源）
 └─ data/
    └─ db.json                   # 单一数据存储（gitignored，运行产物）
 ```

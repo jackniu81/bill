@@ -7,7 +7,7 @@
 
 ## 技术选型与关键决策
 - **运行时**：Node.js >= 20，ESM（`"type":"module"`），JavaScript。
-- **持久化**：JSON 文件存储，**所有用户共用单一 `data/db.json`**；存储采用**结构化（MySQL 式）关系表**——顶层 `{ version, tables: { <表名>: [ 行… ] } }`，每行以 `user_id` 外键归属用户，多对多用关联表（`issue_txs`/`issue_links`）。领域/仓储/引擎仍按「每用户视图」工作，由 `src/store/jsonStore.js` 负责 **表 ↔ 视图** 装配/回写并按 `user_id` 过滤实现隔离；写入用临时文件 + rename 原子落盘，进程重启即从 `db.json` 读回（满足中断恢复）；**旧文档式结构（`version:1` 的 `users` 嵌套）自动迁移**。提供 `scripts/init-db.js`（npm 脚本 `init`/`reset`/`seed`）从 `fixtures/` 重建库，便于重复测试。**无第三方运行时依赖**。
+- **持久化**：JSON 文件存储，**所有用户共用单一 `data/db.json`**；存储采用**结构化（MySQL 式）关系表**——顶层 `{ version, tables: { <表名>: [ 行… ] } }`，每行以 `user_id` 外键归属用户，多对多用关联表（`issue_txs`/`issue_links`）。领域/仓储/引擎仍按「每用户视图」工作，由 `src/store/jsonStore.js` 负责 **表 ↔ 视图** 装配/回写并按 `user_id` 过滤实现隔离；写入用临时文件 + rename 原子落盘，进程重启即从 `db.json` 读回（满足中断恢复）；**旧文档式结构（`version:1` 的 `users` 嵌套）自动迁移**。提供 `scripts/init-db.js`（npm 脚本 `init`/`reset`）建立/重建空库，便于重复测试。**无第三方运行时依赖**。
 - **测试**：Node 内置 `node:test` + `node:assert`（`npm test` → `node --test`，自动发现 `*.test.js`），聚焦主路径 + 关键边界，不臃肿。
 - **金额**：一律用**整数分**存储与计算，避免浮点误差；展示格式化为 RMB 两位小数。
 - **时间**：内部存 epoch 毫秒；展示用 `Asia/Shanghai`。业务判定基于**每用户 SimClock**（可 `advance`），而非真实墙钟。
@@ -46,11 +46,11 @@
 7. **隔离与授权**：所有访问按 `userId` 作用域（单 `db.json` 关系表按 `user_id` 外键过滤）；CLI 强制 `--user`；外部说明不能代替用户授权、不得访问他人数据。
 
 ## 系统架构与模块（`src/`）
-- `store/jsonStore.js`：加载/保存单一 `data/db.json`（MySQL 式关系表：顶层 `{version,tables}`，行带 `user_id`），负责 **关系表 ↔ 每用户视图** 装配/回写（`loadScoped`/`saveScoped`/`clearUser`）、`version:1` 旧文档结构自动迁移、原子写入（临时文件 + rename）、按 `user_id` 过滤实现隔离；配套 `scripts/init-db.js` 提供 `init/reset/seed` 以便重复测试。
+- `store/jsonStore.js`：加载/保存单一 `data/db.json`（MySQL 式关系表：顶层 `{version,tables}`，行带 `user_id`），负责 **关系表 ↔ 每用户视图** 装配/回写（`loadScoped`/`saveScoped`/`clearUser`）、`version:1` 旧文档结构自动迁移、原子写入（临时文件 + rename）、按 `user_id` 过滤实现隔离；配套 `scripts/init-db.js` 提供 `init/reset` 以便重复测试。
 - `domain/`（纯逻辑，无 I/O，单测重点）：`money.js`、`simClock.js`、`rules.js`(10min/72h/24h/max2 常量)、`duplicateDetector.js`、`refundTracker.js`、`reminderScheduler.js`、`issueStateMachine.js`。
 - `repo/`（基于 jsonStore，userId 作用域 + 幂等写入）：`transactionRepo`、`refundRepo`、`issueRepo`、`reminderRepo`、`eventRepo`、`controlRepo`。
 - `app/`（编排）：`ingestService`（幂等导入→触发 tick）、`followUpEngine`（`tick()`：检测/更新/调度/发送，遵守控制态与幂等）、`userService`（标记与控制态）、`queryService`（列表/详情/进展报告，支持"离开再回来了解进展"）、`messaging`（模拟发送 + 关闭前/后语义 + 未知结果）。
-- `cli.js`：`init|reset|seed`、`ingest-tx|ingest-refund|ingest-receipt`（或 `ingest <file.json>`）、`advance <duration>`、`mark <issueId> <action>`、`control <pause|resume|close|reopen>`、`list|show <issueId>|report`，全局 `--user <id>`。
+- `cli.js`：`init|reset`、`ingest-tx|ingest-refund|ingest-receipt`、`advance <duration>`、`mark <issueId> <action>`、`control <pause|resume|close|reopen>`、`list|show <issueId>|report`，全局 `--user <id>`。
 
 ### 目录结构
 ```
@@ -58,11 +58,10 @@ bill/
 ├─ package.json  README.md(交付2)  DESIGN.md(交付4)  ACCEPTANCE.md(交付3)  CHANGELOG.md(交付1修改说明)
 ├─ .gitignore(data/, node_modules/)
 ├─ src/{cli.js,config.js,store/,domain/,repo/,app/}
-├─ scripts/init-db.js(init/reset/seed, 便于重复测试)
+├─ scripts/init-db.js(init/reset, 便于重复测试)
 ├─ tests/unit-test/*.test.js(helpers)      # 单元测试（node --test）
 ├─ tests/integration-test/scenario1..10.js, run-all.js, harness.js   # 进程内验收/集成
 ├─ tests/e2e-test/e2e-cli.js               # 真·端到端 CLI 验收
-├─ fixtures/*.json(小型虚构数据, 标明模拟范围)
 └─ data/db.json(单文件存所有用户)
 ```
 
@@ -81,7 +80,7 @@ bill/
 | 10 | 提醒后中断恢复 | 持久化+engine | 保留计数与处理状态 |
 
 ## 交付物映射（交付 1–6）
-- **交付1**：完整源码 + `CHANGELOG.md`(修改说明) + `README` 依赖/配置示例 + `fixtures/` 测试数据；**无第三方运行时依赖（仅 Node 内置模块）**，注明自研组件与改动；不含真实密钥/私人数据。
+- **交付1**：完整源码 + `CHANGELOG.md`(修改说明) + `README` 依赖/配置示例 + `tests/` 测试数据（三层测试均自建数据）；**无第三方运行时依赖（仅 Node 内置模块）**，注明自研组件与改动；不含真实密钥/私人数据。
 - **交付2**：`README.md` — 干净环境启动、输入需求、推进模拟时间/事件、查看结果、运行验收的命令说明（不必等真实数天）。
 - **交付3**：`ACCEPTANCE.md` — 逐项验收记录（场景/输入/预期/实际/证据位置），可由 `tests/integration-test/run-all.js` 与 `tests/e2e-test/e2e-cli.js` 输出汇总；如实写未实现/失败/修复复测。
 - **交付4**：`DESIGN.md` — 简短设计（需求理解、进展保留、条件变化/未知结果处理、取舍，区分实现与设想）。
@@ -89,7 +88,7 @@ bill/
 - **交付6**：AI/Agent 协作记录直接由 **Qoder 会话历史导出**满足（用户可自行获取 Qoder 历史），**不再单独维护 ai-history.txt**；导出内容允许脱敏，缺失部分如实标注、不伪造、不以总结冒充。
 
 ## 任务分解（里程碑级，不过度细化）
-- **T1 脚手架与持久化基础**：`package.json`、目录、`store/jsonStore.js`（单 `data/db.json` 加载/保存/原子写/初始结构）、`scripts/init-db.js`（`init/reset/seed` 从 fixtures 重建，便于重复测试）、npm scripts、`.gitignore`、`config.js`。
+- **T1 脚手架与持久化基础**：`package.json`、目录、`store/jsonStore.js`（单 `data/db.json` 加载/保存/原子写/初始结构）、`scripts/init-db.js`（`init/reset` 建立/重建空库，便于重复测试）、npm scripts、`.gitignore`、`config.js`。
 - **T2 基础领域件**：`money`(分/RMB)、`simClock`(每用户 advance/now、北京时间格式化)、`rules` 常量。
 - **T3 疑似重复检测**：配对(≤10min/同商户同额不同号)、每无序对去重、三笔→三条并关联、疑似措辞、重放不新增/不重开。
 - **T4 退款跟踪**：申请/到账按 refund_id 关联、先到账保留、按 receipt_id 幂等聚合、差额、72h 逾期判定、全额到账=解决、场景5不发过期消息。
@@ -99,9 +98,9 @@ bill/
 - **T8 跟进引擎与控制态**：`followUpEngine.tick()` 触发点；暂停/恢复(不补发过期、不清计数)/关闭(停自动推进)/重开(需明确)；发送前关闭不发、发后不撤回、未知结果标注核实不盲目重试；中断恢复保留计数与状态。
 - **T9 消息与诚实性 + 查询报告**：`messaging`、`queryService`（list/show/report，进展摘要），缺失/失败/未知如实呈现。
 - **T10 CLI**：`cli.js` 全命令 + `--user`。
-- **T11 验收场景脚本 1–10**：`tests/integration-test/scenario1..10.js` + `run-all.js`，运行前 `reset/seed` 重建 `db.json`、每场景独立 userId、可重放、打印预期/实际/PASS-FAIL。
+- **T11 验收场景脚本 1–10**：`tests/integration-test/scenario1..10.js` + `run-all.js`，运行前 `reset` 重建 `db.json`、每场景独立 userId、可重放、打印预期/实际/PASS-FAIL。
 - **T12 测试**：`node:test` 覆盖配对/退款聚合/提醒调度/幂等/引擎主路径 + 关键边界。
-- **T13 文档与交付物**：README(交付2)、DESIGN(交付4)、ACCEPTANCE(交付3)、CHANGELOG(交付1)、fixtures 模拟数据+范围声明、demo 脚本(交付5)；交付6 由 Qoder 会话历史导出，无需单独文件。
+- **T13 文档与交付物**：README(交付2)、DESIGN(交付4)、ACCEPTANCE(交付3)、CHANGELOG(交付1)、三层测试数据(交付1，均自建)、demo 脚本(交付5)；交付6 由 Qoder 会话历史导出，无需单独文件。
 
 ## 测试计划
 - 单元测试（`tests/unit-test/`）：`duplicateDetector`(2笔成对/3笔三对关联/边界10min/重放不新增)、`refundTracker`(部分到账差额/全额解决/先到账后申请不发逾期/receipt 幂等)、`reminderScheduler`(首次+两次追加后停/明天再提醒取较晚且不清零/确有问题停催/新数据不重置)、`idempotency`(交易/到账重放)、`engine`(暂停不补发、关闭后补事实不重开、重启恢复计数)。
@@ -109,7 +108,7 @@ bill/
 - 端到端测试（`tests/e2e-test/e2e-cli.js`，**真·进程**）：逐条 `spawn` 独立 `node src/cli.js` 子进程复现同 10 场景（`npm run e2e`），读写独立临时库；因每命令为独立进程，额外真实覆盖跨进程持久化/中断恢复，与 `run-all.js` 互为补证。
 
 ## 已确认的关键假设与决策
-- 采用 ESM + Node>=20 + `node:test`；**无第三方运行时依赖**；持久化为**单一 `data/db.json`（MySQL 式关系表，行以 `user_id` 外键归属用户实现隔离）**；提供 `scripts/init-db.js`（init/reset/seed）便于重复测试；SimClock 每用户独立。
+- 采用 ESM + Node>=20 + `node:test`；**无第三方运行时依赖**；持久化为**单一 `data/db.json`（MySQL 式关系表，行以 `user_id` 外键归属用户实现隔离）**；提供 `scripts/init-db.js`（init/reset）便于重复测试；SimClock 每用户独立。
 - 场景中 09:00/09:05 等按北京时间、固定模拟起始日解释。
 - "明天再提醒"若只给日期无时点，默认沿用当前时钟时点并在输出中标注为默认假设。
 - 交付5 以可重放脚本等价演示，真实录屏由用户录制。

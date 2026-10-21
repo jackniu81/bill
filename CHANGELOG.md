@@ -2,6 +2,15 @@
 
 本文件记录实现过程的里程碑与关键改动（交付1 的"修改说明"）。组件均为自研，**无第三方运行时依赖**（仅 Node 内置模块）。
 
+## v0.2.3 — 移除 `fixtures/` 与 `seed` 命令
+> 验收与回归已全部由三层测试覆盖（`tests/unit-test`、`tests/integration-test`、`tests/e2e-test` 均自建数据），内置样例与 `seed` 导入均冗余；数据库用 `init`/`reset` 建立空库即可。
+- 删除 `fixtures/sample.json` 与 `fixtures/` 目录（运行不再依赖）。
+- `src/config.js`：移除 `FIXTURES_DIR`。
+- 彻底删除 `seed` 命令：`scripts/init-db.js`（仅留 `init`/`reset`）、`package.json`（去 `seed` 脚本）、`src/cli.js`（去 `seed` 分支与帮助行）。
+- 文档同步：`README.md`、`specs/spec.md` 中所有 `fixtures`/`seed` 描述均删除（初始化仅保留 init/reset）。
+- **验证**：`npm run init/reset`、`npm test`、`npm run scenarios`、`npm run e2e`、`npm run demo` 均退出码 0。
+
+
 ## v0.2.2 — 测试目录重组：`test/` + `scenarios/` → `tests/`（三层子目录）
 > 将全部测试按类型集中到 `tests/` 下三个子目录（`git mv` 保留历史）；业务代码（`src/`）零改动。
 - `tests/unit-test/`：原 `test/` 的 `helpers.js` + `domain/scheduler/engine.test.js`（`../src` → `../../src`）。

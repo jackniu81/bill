@@ -15,7 +15,6 @@
     "cli": "node src/cli.js",
     "init": "node scripts/init-db.js init",
     "reset": "node scripts/init-db.js reset",
-    "seed": "node scripts/init-db.js seed",
     "scenarios": "node tests/integration-test/run-all.js",
     "e2e": "node tests/e2e-test/e2e-cli.js",
     "demo": "node scripts/demo.js"

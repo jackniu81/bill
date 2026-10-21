@@ -88,7 +88,7 @@ function usage() {
   list      问题列表     show <issueId>  详情+时间线     report  进展报告(含缺口)
 
 库管理:
-  init | reset | seed <fixture.json>
+  init | reset
 `);
 }
 
@@ -106,10 +106,6 @@ function main() {
       else store.load();
       store.flush();
       return print({ ok: true, cmd, db: resolveDbPath() });
-    }
-    if (cmd === 'seed') {
-      print({ ok: false, note: 'seed 由 scripts/init-db.js 提供，请运行: node scripts/init-db.js seed <file>' });
-      return;
     }
 
     const { store, node } = loadNode(userId);
