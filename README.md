@@ -16,8 +16,8 @@
 | 交付2 运行说明 | 本 `README.md` |
 | 交付3 验收记录 | `ACCEPTANCE.md`（由 `tests/integration-test/run-all.js` 与 `tests/e2e-test/e2e-cli.js` 输出佐证） |
 | 交付4 设计说明 | `DESIGN.md`（+ `specs/spec.md` 规格定稿） |
-| 交付5 演示 | `npm run demo`（`scripts/demo.js`）+ `npm run scenarios` |
-| 交付6 AI 协作记录 | 由 Qoder 会话历史导出（不单独维护文件） |
+| 交付5 演示 | `npm run e2e` （真·端到端，逐条 spawn CLI 子进程跑完 10 场景） |
+| 交付6 AI 协作记录 | 子目录：`ai-conversation-history` |
 
 ## 环境要求
 - **Node.js >= 20**（开发验证于 v24）。ESM 工程（`"type":"module"`）。
