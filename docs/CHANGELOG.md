@@ -2,6 +2,12 @@
 
 本文件记录实现过程的里程碑与关键改动（交付1 的"修改说明"）。组件均为自研，**无第三方运行时依赖**（仅 Node 内置模块）。
 
+## v0.2.4 — 文档归集到 `docs/`
+> 将三份交付文档移入 `docs/` 子目录（`git mv` 保留历史）；`README.md` 与 `specs/spec.md` 保留在根目录。业务代码（`src/`）与测试零改动。
+- `ACCEPTANCE.md` → `docs/ACCEPTANCE.md`；`CHANGELOG.md` → `docs/CHANGELOG.md`；`DESIGN.md` → `docs/DESIGN.md`。
+- 引用同步：`README.md`（交付物对照表 + 目录结构树）与 `specs/spec.md`（目录结构 + 交付物映射）中的路径均改为 `docs/*`。本文件旧条目中的历史文件名描述作为当时快照保留不改。
+- **验证**：`npm test`、`npm run scenarios`、`npm run e2e` 均退出码 0（本次仅改文档与引用，未触及代码）。
+
 ## v0.2.3 — 移除 `fixtures/` 与 `seed` 命令
 > 验收与回归已全部由三层测试覆盖（`tests/unit-test`、`tests/integration-test`、`tests/e2e-test` 均自建数据），内置样例与 `seed` 导入均冗余；数据库用 `init`/`reset` 建立空库即可。
 - 删除 `fixtures/sample.json` 与 `fixtures/` 目录（运行不再依赖）。

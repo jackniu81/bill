@@ -12,10 +12,10 @@
 ## 交付物对照
 | 交付 | 位置 |
 |------|------|
-| 交付1 源码 + 修改说明 + 依赖/配置 + 测试数据 | `src/`、`tests/`、`CHANGELOG.md`、`package.json` |
+| 交付1 源码 + 修改说明 + 依赖/配置 + 测试数据 | `src/`、`tests/`、`docs/CHANGELOG.md`、`package.json` |
 | 交付2 运行说明 | 本 `README.md` |
-| 交付3 验收记录 | `ACCEPTANCE.md`（由 `tests/integration-test/run-all.js` 与 `tests/e2e-test/e2e-cli.js` 输出佐证） |
-| 交付4 设计说明 | `DESIGN.md`（+ `specs/spec.md` 规格定稿） |
+| 交付3 验收记录 | `docs/ACCEPTANCE.md`（由 `tests/integration-test/run-all.js` 与 `tests/e2e-test/e2e-cli.js` 输出佐证） |
+| 交付4 设计说明 | `docs/DESIGN.md`（+ `specs/spec.md` 规格定稿） |
 | 交付5 演示 | `npm run e2e` （真·端到端，逐条 spawn CLI 子进程跑完 10 场景） |
 | 交付6 AI 协作记录 | 子目录：`ai-conversation-history` |
 
@@ -233,9 +233,10 @@ node src/cli.js list --user u10
 bill/
 ├─ package.json                 # 工程配置（ESM）与脚本命令（init/reset/demo/scenarios/e2e/unit-test/integration-test/e2e-test/test）
 ├─ README.md                    # 运行说明（交付2）
-├─ DESIGN.md                    # 设计说明（交付4）
-├─ ACCEPTANCE.md                # 验收记录（交付3，由 tests/integration-test/run-all.js 与 tests/e2e-test/e2e-cli.js 输出佐证）
-├─ CHANGELOG.md                 # 修改说明（交付1）
+├─ docs/                        # 设计/验收/修改说明文档
+│  ├─ DESIGN.md                 # 设计说明（交付4）
+│  ├─ ACCEPTANCE.md             # 验收记录（交付3，由 tests/integration-test/run-all.js 与 tests/e2e-test/e2e-cli.js 输出佐证）
+│  └─ CHANGELOG.md              # 修改说明（交付1）
 ├─ AGENTS.md                    # AI 协作约定（回复语言/测试/git 规范）
 ├─ .gitignore                   # 忽略 data/ 等运行产物
 ├─ specs/                       # 需求与规格

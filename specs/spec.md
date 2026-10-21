@@ -55,7 +55,8 @@
 ### 目录结构
 ```
 bill/
-├─ package.json  README.md(交付2)  DESIGN.md(交付4)  ACCEPTANCE.md(交付3)  CHANGELOG.md(交付1修改说明)
+├─ package.json  README.md(交付2)
+├─ docs/{DESIGN.md(交付4), ACCEPTANCE.md(交付3), CHANGELOG.md(交付1修改说明)}
 ├─ .gitignore(data/, node_modules/)
 ├─ src/{cli.js,config.js,store/,domain/,repo/,app/}
 ├─ scripts/init-db.js(init/reset, 便于重复测试)
@@ -80,10 +81,10 @@ bill/
 | 10 | 提醒后中断恢复 | 持久化+engine | 保留计数与处理状态 |
 
 ## 交付物映射（交付 1–6）
-- **交付1**：完整源码 + `CHANGELOG.md`(修改说明) + `README` 依赖/配置示例 + `tests/` 测试数据（三层测试均自建数据）；**无第三方运行时依赖（仅 Node 内置模块）**，注明自研组件与改动；不含真实密钥/私人数据。
+- **交付1**：完整源码 + `docs/CHANGELOG.md`(修改说明) + `README` 依赖/配置示例 + `tests/` 测试数据（三层测试均自建数据）；**无第三方运行时依赖（仅 Node 内置模块）**，注明自研组件与改动；不含真实密钥/私人数据。
 - **交付2**：`README.md` — 干净环境启动、输入需求、推进模拟时间/事件、查看结果、运行验收的命令说明（不必等真实数天）。
-- **交付3**：`ACCEPTANCE.md` — 逐项验收记录（场景/输入/预期/实际/证据位置），可由 `tests/integration-test/run-all.js` 与 `tests/e2e-test/e2e-cli.js` 输出汇总；如实写未实现/失败/修复复测。
-- **交付4**：`DESIGN.md` — 简短设计（需求理解、进展保留、条件变化/未知结果处理、取舍，区分实现与设想）。
+- **交付3**：`docs/ACCEPTANCE.md` — 逐项验收记录（场景/输入/预期/实际/证据位置），可由 `tests/integration-test/run-all.js` 与 `tests/e2e-test/e2e-cli.js` 输出汇总；如实写未实现/失败/修复复测。
+- **交付4**：`docs/DESIGN.md` — 简短设计（需求理解、进展保留、条件变化/未知结果处理、取舍，区分实现与设想）。
 - **交付5**：`tests/integration-test/run-all.js` + 一个带旁白的 `demo` 脚本作为**等价可重放演示**（涵盖正常/异常/核验）；真实录屏由用户按需录制，不替代源码与运行说明。
 - **交付6**：AI/Agent 协作记录直接由 **Qoder 会话历史导出**满足（用户可自行获取 Qoder 历史），**不再单独维护 ai-history.txt**；导出内容允许脱敏，缺失部分如实标注、不伪造、不以总结冒充。
 
