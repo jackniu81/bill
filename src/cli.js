@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 账单疑似问题跟进系统 —— CLI（纯模拟；时间北京时间，金额人民币元）。
 // 全局：--user <id>（隔离）。示例见 README。
-import { Store, ensureUserNode } from './store/jsonStore.js';
+import { Store, emptyDb } from './store/jsonStore.js';
 import { resolveDbPath } from './config.js';
 import { yuanToCents, formatRMB } from './domain/money.js';
 import { beijingMs, parseDuration, advance, setNow, getNow } from './domain/simClock.js';
@@ -102,7 +102,7 @@ function main() {
 
     if (cmd === 'init' || cmd === 'reset') {
       const store = new Store(resolveDbPath());
-      if (cmd === 'reset') store.db = { version: 1, users: {} };
+      if (cmd === 'reset') store.db = emptyDb();
       else store.load();
       store.flush();
       return print({ ok: true, cmd, db: resolveDbPath() });

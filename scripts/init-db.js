@@ -4,7 +4,7 @@
 //   node scripts/init-db.js seed <file>     # 从 fixture 重建库（仅基础事实，问题由引擎生成）
 import fs from 'node:fs';
 import path from 'node:path';
-import { Store, defaultUserNode, emptyDb } from '../src/store/jsonStore.js';
+import { Store, defaultUserNode, emptyDb, ensureUser, saveScoped } from '../src/store/jsonStore.js';
 import { resolveDbPath, FIXTURES_DIR } from '../src/config.js';
 
 const cmd = process.argv[2] || 'init';
@@ -53,15 +53,17 @@ switch (cmd) {
     const s = freshStore();
     const users = fixture.users || {};
     for (const [uid, data] of Object.entries(users)) {
+      ensureUser(s.db, uid);
       const node = defaultUserNode(uid);
       node.transactions = (data.transactions || []).slice();
       node.refund_applications = (data.refund_applications || []).slice();
       node.refund_receipts = (data.refund_receipts || []).slice();
       if (data.clock && typeof data.clock.now_at === 'number') node.clock.now_at = data.clock.now_at;
-      s.db.users[uid] = node;
+      saveScoped(s.db, uid, node);
     }
     s.flush();
-    console.log(`[seed] 已从 ${file} 重建 db.json（${Object.keys(s.db.users).length} 个用户）`);
+    const userCount = s.db.tables.users.length;
+    console.log(`[seed] 已从 ${file} 重建 db.json（${userCount} 个用户，关系表结构）`);
     console.log('[seed] 注意: 仅为模拟数据；疑似问题由引擎在处理数据后自动生成。');
     break;
   }
