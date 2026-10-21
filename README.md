@@ -1,10 +1,13 @@
 # 账单疑似问题跟进系统（纯模拟）
+> 说明
+> - AI IDE： Qoder IDE CN; LLM: Qwen3.8-max, Qwen3.8-flash
+> - 时间： 12:00 ~ 14:00
 
 发现账单问题后**持续跟进**的模拟系统：检测「疑似重复扣款」与「退款逾期」，管理提醒调度、用户标记、暂停/恢复/关闭与中断恢复。
 
 > ⚠️ **纯模拟**：不连接任何银行/支付接口，不做真实付款或真实消息发送。所有数据为虚构样例，金额单位为人民币（整数分），时间为北京时间（Asia/Shanghai）。
 
-> AI IDE： 
+
 
 ## 交付物对照
 | 交付 | 位置 |
@@ -59,36 +62,146 @@ npm run demo
 | `list` / `show <issueId>` / `report` | 查看问题列表 / 详情+处理时间线 / 进展报告（含缺口） |
 
 ## CLI 运行 10 个验收场景
-10 个场景（`scenarios/scenario1.js … scenario10.js`）覆盖需求全部关键规则，每个用**独立 userId + 独立临时库**、运行前重建干净节点，**可重复、互不串扰**。它们直接驱动完整业务栈（导入事实 → 引擎自检 → 提醒调度 → 查询/时间线），逐条断言并打印「输入 / 预期 / 证据(实际) / PASS-FAIL」。
 
+下面用 CLI **逐一**复现 10 个验收场景（与 `scenarios/scenario*.js` 断言等价）。要点：
+- **每条 `node src/cli.js` 都是独立进程**，自动从 `data/db.json` 读写——因此命令序列本身就演示了「中断恢复 / 持久化」。
+- **每个场景前先 `reset`**：清空库、归零时钟，保证可重放（`advance` 会推进持久化的时钟）。导入按业务编号幂等、问题按确定性 `issue_id` 去重，故重复执行同批命令不会新增/重发。
+- 含 `|` 的问题号（如 `DUP:TX1|TX2`）在多数 shell 需加**引号**。
+- 用 `list`（看 `status`/`reminders_sent`）、`show`（看详情+`timeline`）、`report`（看 `gaps`/计数）观察结果。
+- `mark` 动作别名：`normal`(正常两次购买) / `confirm`(确有问题) / `tomorrow`(明天再提醒) / `resolved`(已自行解决) / `close`(关闭)。
+- 一键批量（自动跑完并 PASS/FAIL 汇总）：`npm run scenarios`。
+
+### 场景 1 — 疑似重复建一条问题
 ```bash
-# 一次性运行全部 10 个场景并汇总（推荐，作为交付3验收证据）
-npm run scenarios          # 等价：node scenarios/run-all.js
-
-# 只运行单个场景（按需排查）——每个文件导出 { meta, run() }
-node --input-type=module -e "const m=await import('./scenarios/scenario4.js');const r=m.run();console.log(m.meta);console.table(r.checks.map(c=>({断言:c.desc,通过:c.ok})));"
+node scripts/init-db.js reset
+node src/cli.js set-now  --at "2026-10-01 09:05" --user u1
+node src/cli.js ingest-tx --id TX1 --merchant 某商户 --amount 30 --at "2026-10-01 09:00" --user u1
+node src/cli.js ingest-tx --id TX2 --merchant 某商户 --amount 30 --at "2026-10-01 09:05" --user u1
+node src/cli.js list --user u1
 ```
+**预期**：`list` 只有一条 `"DUP:TX1|TX2"`，`status=SUSPECT`、`reminders_sent=1`；`report` 显示两笔交易仍保留（引擎不删除交易）。
 
-**输出与判定**
-- 每个场景打印形如 `✓/✗ <断言>` 与 `证据：{...}`（实际状态/计数/差额等），末尾汇总为 `[PASS]/[FAIL] 场景 N（通过 x / 失败 y）`。
-- 全部通过：最后一行 `结果：PASS（全部验收场景通过）`，进程**退出码 0**。
-- 任一断言失败（或场景运行抛异常）：`结果：FAIL`，进程**退出码 1**（如实呈现，不伪装为通过）——便于 CI 用退出码拦截。
+### 场景 2 — 标“正常两次购买”并重放
+```bash
+node scripts/init-db.js reset
+node src/cli.js set-now  --at "2026-10-01 09:05" --user u2
+node src/cli.js ingest-tx --id TX1 --merchant 某商户 --amount 30 --at "2026-10-01 09:00" --user u2
+node src/cli.js ingest-tx --id TX2 --merchant 某商户 --amount 30 --at "2026-10-01 09:05" --user u2
+node src/cli.js mark "DUP:TX1|TX2" normal --user u2
+# 重放同批交易（模拟再次导入）
+node src/cli.js ingest-tx --id TX1 --merchant 某商户 --amount 30 --at "2026-10-01 09:00" --user u2
+node src/cli.js ingest-tx --id TX2 --merchant 某商户 --amount 30 --at "2026-10-01 09:05" --user u2
+node src/cli.js show "DUP:TX1|TX2" --user u2
+```
+**预期**：`status=NORMAL`、`closure_basis=USER_MARKED_NORMAL`；重放后 `list` 仍只有一条（不重开、不新增）。
 
-**场景 ↔ 规则 ↔ 预期**
-| # | 场景 | 预期要点 |
-|---|------|---------|
-| 1 | 疑似重复建一条 | 一条 `SUSPECT`，两笔交易都保留（不删） |
-| 2 | 标正常并重放 | 记 `NORMAL`；重放不重开、不新增 |
-| 3 | 三笔两两成对 | 三条问题且互相 `link_issue_ids` 关联；不称"已证实" |
-| 4 | 逾期→部分→全额 | 逾期提醒；显示差额 ¥40；全额才 `RESOLVED`；重放不累计 |
-| 5 | 全额先于申请 | 先到账列为缺口并保留；齐全即解决、不发逾期 |
-| 6 | 持续不回复 | ≥24h/≥48h 各追加一次，最多两次后不再催 |
-| 7 | 明天再提醒 | 至少延后 24h；追加次数不清零 |
-| 8 | 确认未解决 | `PENDING_RESOLUTION`（确有问题 ≠ 解决） |
-| 9 | 关闭后到账 | 只补事实记录；不重开、不催办 |
-| 10 | 中断恢复 | 重启读回计数与状态；不重发、继续按规则追加 |
+### 场景 3 — 三笔两两成对 → 三条并关联
+```bash
+node scripts/init-db.js reset
+node src/cli.js set-now  --at "2026-10-01 09:09" --user u3
+node src/cli.js ingest-tx --id TX1 --merchant 某商户 --amount 30 --at "2026-10-01 09:00" --user u3
+node src/cli.js ingest-tx --id TX2 --merchant 某商户 --amount 30 --at "2026-10-01 09:05" --user u3
+node src/cli.js ingest-tx --id TX3 --merchant 某商户 --amount 30 --at "2026-10-01 09:09" --user u3
+# 重放三笔
+node src/cli.js ingest-tx --id TX1 --merchant 某商户 --amount 30 --at "2026-10-01 09:00" --user u3
+node src/cli.js ingest-tx --id TX2 --merchant 某商户 --amount 30 --at "2026-10-01 09:05" --user u3
+node src/cli.js ingest-tx --id TX3 --merchant 某商户 --amount 30 --at "2026-10-01 09:09" --user u3
+node src/cli.js list --user u3
+node src/cli.js show "DUP:TX1|TX2" --user u3   # 看 link_issue_ids 与措辞
+```
+**预期**：恰有三条 `DUP:TX1|TX2`、`DUP:TX1|TX3`、`DUP:TX2|TX3`；每条 `link_issue_ids` 长度为 2（互相关联）；均为 `SUSPECT`，描述为“疑似”、不称“已证实”。
 
-> 场景为**进程内验收/集成测试**（贯穿服务层与真实文件持久化）；单元测试见下一节，二者互补。
+### 场景 4 — 逾期 → 部分到账 → 全额解决（含重放）
+```bash
+node scripts/init-db.js reset
+node src/cli.js set-now  --at "2026-10-01 09:00" --user u4
+node src/cli.js ingest-refund --refund-id R1 --expected 100 --confirmed-at "2026-10-01 09:00" --user u4
+node src/cli.js list --user u4                                   # 未到期：reminders_sent=0
+node src/cli.js advance 72h --user u4                            # 满72h逾期
+node src/cli.js ingest-receipt --receipt-id RC60 --refund-id R1 --amount 60 --received-at "2026-10-04 10:00" --user u4
+node src/cli.js show "RFD:R1" --user u4                          # received_cents=6000, remaining_cents=4000
+node src/cli.js ingest-receipt --receipt-id RC40 --refund-id R1 --amount 40 --received-at "2026-10-05 10:00" --user u4
+node src/cli.js ingest-receipt --receipt-id RC60 --refund-id R1 --amount 60 --received-at "2026-10-04 10:00" --user u4  # 重放到账
+node src/cli.js show "RFD:R1" --user u4
+```
+**预期**：72h 前不发提醒；到点逾期发一次；到账 ¥60 显示差额 ¥40（`status` 仍 SUSPECT）；补足 ¥40 后 `status=RESOLVED`、`closure_basis=VERIFIED_BY_REFUND`；重放 `RC60` 后 `received_cents` 仍 10000（不累计）。
+
+### 场景 5 — 全额到账先于申请
+```bash
+node scripts/init-db.js reset
+node src/cli.js set-now  --at "2026-10-01 09:00" --user u5
+node src/cli.js ingest-receipt --receipt-id RC100 --refund-id R2 --amount 100 --received-at "2026-10-01 08:00" --user u5
+node src/cli.js report --user u5                                 # gaps 含 R2（孤儿到账）
+node src/cli.js ingest-refund --refund-id R2 --expected 100 --confirmed-at "2026-10-01 09:00" --user u5
+node src/cli.js show "RFD:R2" --user u5
+node src/cli.js report --user u5                                 # 齐全后 gaps 清空
+```
+**预期**：先到账被保留并列为缺口；申请到达后 `received>=expected` 直接 `RESOLVED/VERIFIED_BY_REFUND`、`reminders_sent=0`（不发过期逾期消息）。
+
+### 场景 6 — 首次提醒后持续不回复
+```bash
+node scripts/init-db.js reset
+node src/cli.js set-now  --at "2026-10-01 09:00" --user u6
+node src/cli.js ingest-refund --refund-id R6 --expected 100 --confirmed-at "2026-10-01 09:00" --user u6
+node src/cli.js advance 72h --user u6   # 逾期→首次提醒（reminders_sent=1）
+node src/cli.js advance 24h --user u6   # 追加第一次（=2）
+node src/cli.js advance 24h --user u6   # 追加第二次（=3）
+node src/cli.js advance 72h --user u6   # 已达上限，不再催
+node src/cli.js list --user u6
+```
+**预期**：逾期后 reminders_sent 依次为 1→2→3，继续 `advance` 仍为 3（最多两次追加，以后不催）。
+
+### 场景 7 — 明天再提醒
+```bash
+node scripts/init-db.js reset
+node src/cli.js set-now  --at "2026-10-01 09:00" --user u7
+node src/cli.js ingest-refund --refund-id R7 --expected 100 --confirmed-at "2026-10-01 09:00" --user u7
+node src/cli.js advance 72h --user u7                 # 逾期首次提醒（10-04 09:00）
+node src/cli.js mark "RFD:R7" tomorrow --user u7      # 明天再提醒（默认+24h）
+node src/cli.js advance 23h --user u7   # 尚未到点：reminders_sent 仍=1
+node src/cli.js advance 1h  --user u7   # 10-05 09:00 到点：追加（=2）
+node src/cli.js list --user u7
+```
+**预期**：标记“明天再提醒”不立即触发新提醒；不足 24h 时仍为 1，满 24h 才发第 2 条（追加计入次数、不清零）。若要指定时点：`mark "RFD:R7" tomorrow --remind-at "2026-10-05 20:00" --user u7`。
+
+### 场景 8 — 确认重复但无解决结果
+```bash
+node scripts/init-db.js reset
+node src/cli.js set-now  --at "2026-10-01 09:05" --user u8
+node src/cli.js ingest-tx --id TX1 --merchant 某商户 --amount 30 --at "2026-10-01 09:00" --user u8
+node src/cli.js ingest-tx --id TX2 --merchant 某商户 --amount 30 --at "2026-10-01 09:05" --user u8
+node src/cli.js mark "DUP:TX1|TX2" confirm --user u8   # 确有问题 ≠ 解决
+node src/cli.js show "DUP:TX1|TX2" --user u8
+```
+**预期**：`status=PENDING_RESOLUTION`、`closure_basis=null`（确有问题只进入待解决，不等于解决）。
+
+### 场景 9 — 关闭后到账
+```bash
+node scripts/init-db.js reset
+node src/cli.js set-now  --at "2026-10-01 09:00" --user u9
+node src/cli.js ingest-refund --refund-id R9 --expected 100 --confirmed-at "2026-10-01 09:00" --user u9
+node src/cli.js advance 72h --user u9                   # 逾期首次提醒
+node src/cli.js mark "RFD:R9" close --user u9           # 关闭
+node src/cli.js ingest-receipt --receipt-id RC9 --refund-id R9 --amount 50 --received-at "2026-10-06 10:00" --user u9  # 关闭后到账
+node src/cli.js show "RFD:R9" --user u9
+```
+**预期**：`status` 仍 `CLOSED`（不重开）、`reminders_sent` 不变（不催）；`timeline` 追加一条“关闭后到账”的 `fact_ingested` 事件（只补记录）。
+
+### 场景 10 — 中断恢复保留计数与状态
+> CLI 每条命令即独立进程、每次都重新读盘，因此下面的 `list`/`show` 天然模拟了“进程重启后状态恢复”。
+```bash
+node scripts/init-db.js reset
+node src/cli.js set-now  --at "2026-10-01 09:00" --user u10
+node src/cli.js ingest-refund --refund-id R10 --expected 100 --confirmed-at "2026-10-01 09:00" --user u10
+node src/cli.js advance 72h --user u10
+node src/cli.js list --user u10         # 新进程读回：reminders_sent=1，未重发
+node src/cli.js advance 24h --user u10  # 计数不清零，继续追加 → =2
+node src/cli.js list --user u10
+node src/cli.js advance 24h --user u10  # =3
+node src/cli.js advance 72h --user u10  # 最多两次，仍 =3
+node src/cli.js list --user u10
+```
+**预期**：重启后首次提醒不重复发送、计数与处理状态原样读回；继续按规则追加且最多两次。
 
 ## "自主检查"如何工作（无需等待真实数天）
 模拟环境不跑后台守护进程。引擎 `tick()` 在 `advance`、`ingest-*`、`mark`、`control` 之后自动触发一次自检：检测疑似重复、更新退款到账与逾期、按调度规则发送提醒。业务判定用**每用户 SimClock**，用 `advance` 快进时间即可立即验证 72h 逾期、24h/48h 追加等效果，不必真的等待。
