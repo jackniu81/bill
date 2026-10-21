@@ -2,11 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
-import { Store, defaultUserNode } from '../src/store/jsonStore.js';
-import { tick } from '../src/app/followUpEngine.js';
-import { ingestTransaction, ingestRefundApplication, ingestRefundReceipt } from '../src/app/ingestService.js';
-import { markIssue, setControl } from '../src/app/userService.js';
-import { beijingMs, setNow, advance } from '../src/domain/simClock.js';
+import { Store, defaultUserNode } from '../../src/store/jsonStore.js';
+import { tick } from '../../src/app/followUpEngine.js';
+import { ingestTransaction, ingestRefundApplication, ingestRefundReceipt } from '../../src/app/ingestService.js';
+import { markIssue, setControl } from '../../src/app/userService.js';
+import { beijingMs, setNow, advance } from '../../src/domain/simClock.js';
 
 const sent = (node, id) => node.reminders.filter((r) => r.issue_id === id && r.status === 'sent');
 const issue = (node, id) => node.issues.find((i) => i.issue_id === id);

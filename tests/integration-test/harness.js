@@ -2,15 +2,15 @@
 // restart() 通过 flush + 重新读盘模拟进程中断恢复。
 import os from 'node:os';
 import path from 'node:path';
-import { Store, defaultUserNode } from '../src/store/jsonStore.js';
-import { tick } from '../src/app/followUpEngine.js';
-import { ingestTransaction, ingestRefundApplication, ingestRefundReceipt } from '../src/app/ingestService.js';
-import { markIssue, setControl } from '../src/app/userService.js';
-import { listIssues, showIssue, report } from '../src/app/queryService.js';
-import { beijingMs, parseDuration, setNow, advance, getNow } from '../src/domain/simClock.js';
-import { yuanToCents } from '../src/domain/money.js';
-import { duplicateIssueId } from '../src/domain/duplicateDetector.js';
-import { refundIssueId } from '../src/domain/refundTracker.js';
+import { Store } from '../../src/store/jsonStore.js';
+import { tick } from '../../src/app/followUpEngine.js';
+import { ingestTransaction, ingestRefundApplication, ingestRefundReceipt } from '../../src/app/ingestService.js';
+import { markIssue, setControl } from '../../src/app/userService.js';
+import { listIssues, showIssue, report } from '../../src/app/queryService.js';
+import { beijingMs, parseDuration, setNow, advance, getNow } from '../../src/domain/simClock.js';
+import { yuanToCents } from '../../src/domain/money.js';
+import { duplicateIssueId } from '../../src/domain/duplicateDetector.js';
+import { refundIssueId } from '../../src/domain/refundTracker.js';
 
 export class Scenario {
   constructor(userId, dbPath) {
@@ -18,8 +18,8 @@ export class Scenario {
     this.dbPath = dbPath || path.join(os.tmpdir(), `bill-scenario-${userId}.json`);
     this.store = new Store(this.dbPath);
     this.store.load();
-    // 每次运行为该用户重建干净节点，保证场景可重复、互不串扰（不影响 restart 的读盘恢复）
-    this.store.db.users[userId] = defaultUserNode(userId);
+    // 每次运行为该用户清掉持久化行并重建干净视图，保证场景可重复、互不串扰（不影响 restart 的读盘恢复）
+    this.store.clearUser(userId);
     this.node = this.store.userNode(userId);
   }
 

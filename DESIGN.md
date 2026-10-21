@@ -30,7 +30,7 @@
 - `markIssue` 对终结态回滚状态改动、仅追加事件；关闭后到账在 `ingestRefundReceipt` 补 `fact_ingested` 事件。→ 场景9。
 
 ## 进展如何被保留（离开再回来）
-- 全部落 `db.json`：`issues`（状态/结案依据/关联）、`issue_events`（append-only 处理历史）、`reminders`（发送记录/计数）、`clock`（模拟时钟）、`control`（控制态）。
+- 全部落 `db.json` 关系表：`issues`+`issue_txs`/`issue_links`（状态/结案依据/关联）、`issue_events`（append-only 处理历史）、`reminders`（发送记录/计数）、`clocks`（模拟时钟）、`controls`（控制态）。
 - `report`/`show` 提供进展摘要与时间线；用户"回来"直接读盘即得完整上下文，无需重述。
 - 进程重启（含 `Store` 重新读盘）→ 计数与状态原样读回，不重复处理同一事实。→ 场景10。
 
@@ -42,15 +42,15 @@
 - **明天再提醒**：`next_due = max(既有最早到期, 标记时点(+24h 或明确 --remind-at))`，追加次数**不清零**；只给日期不给时点则沿用当前时钟时点并标注为默认假设。
 
 ## 隔离与授权
-- 单一 `db.json` 内按 `userId` 分组；仓储/服务层只接收当前用户节点，代码路径无法触达他人数据。
+- 单一 `db.json` 采用 MySQL 式关系表，数据行以 `user_id` 外键归属；`jsonStore` 按 `user_id` 过滤装配每用户视图，仓储/服务层只接收当前用户视图，代码路径无法触达他人数据。
 - CLI 强制 `--user`；外部说明（如"帮我看看别人的"）不代替授权、不越过 `userId` 作用域。
 
 ## 分层
 - `domain/` 纯函数（money/simClock/rules/duplicateDetector/refundTracker/reminderScheduler/issueStateMachine）——无 I/O，单测主战场。
 - `repo/` 作用域内幂等读写（按业务唯一键去重）。
 - `app/` 编排（ingest/engine/user/query/messaging）。
-- `cli.js` / `scenarios/` / `scripts/` 为入口与验收面。
+- `cli.js` / `tests/` / `scripts/` 为入口与验收面。测试分三层（均在 `tests/` 下）：`unit-test/`（单测，`node --test` 自动发现）、`integration-test/run-all.js`（进程内集成/验收，直调服务层）、`e2e-test/e2e-cli.js`（真·端到端，逐条 spawn CLI 子进程）。
 
 ## 已实现 vs 设想（明确区分）
-- **已实现并验证**：两类检测、提醒节奏（首次+两次追加+停止条件）、用户标记全语义、暂停/恢复(不补发)/关闭/重开、中断恢复、幂等重放、诚实性缺口呈现、CLI、10 场景 + 单测 + demo。
+- **已实现并验证**：两类检测、提醒节奏（首次+两次追加+停止条件）、用户标记全语义、暂停/恢复(不补发)/关闭/重开、中断恢复、幂等重放、诚实性缺口呈现、CLI、10 场景 + 单测 + demo + 真·端到端 CLI 验收（`e2e-cli.js`）。
 - **设想/未做（如实标注）**：真实银行/消息通道对接；`unknown` 发送结果的真实产生路径；分布式/并发写入锁；跨用户检索（刻意不做以守边界）。这些超出"纯模拟"范围，未纳入本次交付。

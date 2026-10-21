@@ -103,5 +103,5 @@ line(`  → 重新读盘后问题数 = ${node2.issues.length}，提醒记录 = $
 
 line('\n================================================================');
 line(' 演示结束（临时库：' + dbPath + '）。');
-line(' 更多逐条断言请运行：node scenarios/run-all.js');
+line(' 更多逐条断言请运行：node tests/integration-test/run-all.js（或 npm run scenarios）');
 line('================================================================');

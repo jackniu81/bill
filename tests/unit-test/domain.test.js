@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { yuanToCents, formatRMB } from '../src/domain/money.js';
-import { beijingMs, formatBeijing, parseDuration } from '../src/domain/simClock.js';
-import { findDuplicatePairs, duplicateIssueId, buildLinkMap } from '../src/domain/duplicateDetector.js';
-import { computeRefundState, orphanReceipts } from '../src/domain/refundTracker.js';
-import { DUPLICATE_WINDOW_MS, REFUND_OVERDUE_MS } from '../src/domain/rules.js';
-import { defaultUserNode } from '../src/store/jsonStore.js';
-import { setNow } from '../src/domain/simClock.js';
+import { yuanToCents, formatRMB } from '../../src/domain/money.js';
+import { beijingMs, formatBeijing, parseDuration } from '../../src/domain/simClock.js';
+import { findDuplicatePairs, duplicateIssueId, buildLinkMap } from '../../src/domain/duplicateDetector.js';
+import { computeRefundState, orphanReceipts } from '../../src/domain/refundTracker.js';
+import { DUPLICATE_WINDOW_MS, REFUND_OVERDUE_MS } from '../../src/domain/rules.js';
+import { defaultUserNode } from '../../src/store/jsonStore.js';
+import { setNow } from '../../src/domain/simClock.js';
 
 const T = (id, merchant, cents, at) => ({ tx_id: id, merchant, amount_cents: cents, occurred_at: beijingMs('2026-10-01', at) });
 

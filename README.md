@@ -12,9 +12,9 @@
 ## 交付物对照
 | 交付 | 位置 |
 |------|------|
-| 交付1 源码 + 修改说明 + 依赖/配置 + 测试数据 | `src/`、`scenarios/`、`test/`、`fixtures/`、`CHANGELOG.md`、`package.json` |
+| 交付1 源码 + 修改说明 + 依赖/配置 + 测试数据 | `src/`、`tests/`、`fixtures/`、`CHANGELOG.md`、`package.json` |
 | 交付2 运行说明 | 本 `README.md` |
-| 交付3 验收记录 | `ACCEPTANCE.md`（由 `scenarios/run-all.js` 输出佐证） |
+| 交付3 验收记录 | `ACCEPTANCE.md`（由 `tests/integration-test/run-all.js` 与 `tests/e2e-test/e2e-cli.js` 输出佐证） |
 | 交付4 设计说明 | `DESIGN.md`（+ `specs/spec.md` 规格定稿） |
 | 交付5 演示 | `npm run demo`（`scripts/demo.js`）+ `npm run scenarios` |
 | 交付6 AI 协作记录 | 由 Qoder 会话历史导出（不单独维护文件） |
@@ -25,7 +25,7 @@
 
 ## 快速开始
 ```bash
-# 1) 初始化 / 重建数据库（单一 data/db.json，按 userId 分组隔离）
+# 1) 初始化 / 重建数据库（单一 data/db.json，MySQL 式关系表，按 user_id 隔离）
 npm run init          # 不存在则创建空库
 npm run reset         # 清空重建（重复测试前先跑，保证互不串扰）
 npm run seed -- fixtures/sample.json   # 用虚构样例事实重建库
@@ -38,8 +38,9 @@ node src/cli.js show DUP:ATX1\|ATX2 --user alice
 node src/cli.js report --user alice
 
 # 3) 运行验收与测试
-npm run scenarios     # node scenarios/run-all.js：10 个场景，打印 预期/实际/PASS-FAIL
-npm test              # node --test：单元测试（配对/退款/提醒/幂等/引擎）
+npm run scenarios     # node tests/integration-test/run-all.js：进程内直调服务层，10 个场景，打印 预期/实际/PASS-FAIL
+npm run e2e           # node tests/e2e-test/e2e-cli.js：真·端到端，逐条 spawn CLI 子进程跑完 10 场景
+npm test              # node --test tests/unit-test：单元测试（配对/退款/提醒/幂等/引擎，24 项）
 
 # 4) 带旁白演示（正常/异常/核验/控制/诚实/重启）
 npm run demo
@@ -61,15 +62,24 @@ npm run demo
 | `control pause\|resume\|close\|reopen` | 控制持续工作：暂停/恢复/关闭/重开 |
 | `list` / `show <issueId>` / `report` | 查看问题列表 / 详情+处理时间线 / 进展报告（含缺口） |
 
+## 测试分层
+| 层 | 命令 | 特点 |
+|----|------|------|
+| 单元测试 | `npm test` | 纯函数/领域逻辑，不落盘 |
+| 集成/验收（**进程内**） | `npm run scenarios` | 直调服务层 + 真实文件持久化；`restart()` 以 flush+重读模拟中断 |
+| 端到端（**真·进程**） | `npm run e2e` | 每命令一个独立 `node src/cli.js` 子进程，读写独立临时库；天然覆盖跨进程持久化/重启恢复 |
+
+> `tests/e2e-test/e2e-cli.js` **零依赖 `src/`**（仅 `import` Node 内置 `node:child_process/os/path/fs/url`，断言助手内联）：只要 CLI 输入/输出契约不变，业务模块重构不会牵连它。
+
 ## CLI 运行 10 个验收场景
 
-下面用 CLI **逐一**复现 10 个验收场景（与 `scenarios/scenario*.js` 断言等价）。要点：
+下面用 CLI **逐一**复现 10 个验收场景（与 `tests/integration-test/scenario*.js` 断言等价）。要点：
 - **每条 `node src/cli.js` 都是独立进程**，自动从 `data/db.json` 读写——因此命令序列本身就演示了「中断恢复 / 持久化」。
 - **每个场景前先 `reset`**：清空库、归零时钟，保证可重放（`advance` 会推进持久化的时钟）。导入按业务编号幂等、问题按确定性 `issue_id` 去重，故重复执行同批命令不会新增/重发。
 - 含 `|` 的问题号（如 `DUP:TX1|TX2`）在多数 shell 需加**引号**。
 - 用 `list`（看 `status`/`reminders_sent`）、`show`（看详情+`timeline`）、`report`（看 `gaps`/计数）观察结果。
 - `mark` 动作别名：`normal`(正常两次购买) / `confirm`(确有问题) / `tomorrow`(明天再提醒) / `resolved`(已自行解决) / `close`(关闭)。
-- 一键批量（自动跑完并 PASS/FAIL 汇总）：`npm run scenarios`。
+- 一键批量（**进程内**直调服务层）：`npm run scenarios`；一键批量（**真·端到端**：逐条 `spawn` 独立 `node src/cli.js` 进程跑完下述全部命令序列，额外真实覆盖跨进程持久化/重启恢复）：`npm run e2e`（`tests/e2e-test/e2e-cli.js`）。
 
 ### 场景 1 — 疑似重复建一条问题
 ```bash
@@ -207,7 +217,9 @@ node src/cli.js list --user u10
 模拟环境不跑后台守护进程。引擎 `tick()` 在 `advance`、`ingest-*`、`mark`、`control` 之后自动触发一次自检：检测疑似重复、更新退款到账与逾期、按调度规则发送提醒。业务判定用**每用户 SimClock**，用 `advance` 快进时间即可立即验证 72h 逾期、24h/48h 追加等效果，不必真的等待。
 
 ## 数据与持久化
-- 单一 `data/db.json`，顶层 `{ version, users: { <userId>: <用户节点> } }`；仓储层只暴露当前 `userId` 节点，天然隔离。
+- 单一 `data/db.json`，**结构化（MySQL 式）关系表**：顶层 `{ version: 2, tables: { <表名>: [ 行… ] } }`，每张表是行数组，数据行都带 `user_id` 外键归属用户；多对多用关联表（`issue_txs`/`issue_links`）。
+- **表一览**：`users`、`transactions`、`refund_applications`、`refund_receipts`、`issues`、`issue_txs`、`issue_links`、`issue_events`、`reminders`、`controls`（每用户一行）、`clocks`（每用户一行）。
+- **隔离与装配**：领域/仓储/引擎仍按「每用户视图」（数组字段）工作，`src/store/jsonStore.js` 读取时按 `user_id` 过滤装配、写入时整组回写该用户行，跨用户天然隔离；旧文档式结构（`version:1` 的 `users` 嵌套）自动迁移。
 - 写入用「临时文件 + rename」原子落盘；进程重启从 `db.json` 读回计数与处理状态（满足中断恢复）。
 - `data/` 已在 `.gitignore` 忽略（属运行产物）。
 
@@ -221,10 +233,10 @@ node src/cli.js list --user u10
 ## 目录结构
 ```
 bill/
-├─ package.json                 # 工程配置（ESM）与脚本命令（init/reset/seed/demo/scenarios/test）
+├─ package.json                 # 工程配置（ESM）与脚本命令（init/reset/seed/demo/scenarios/e2e/unit-test/integration-test/e2e-test/test）
 ├─ README.md                    # 运行说明（交付2）
 ├─ DESIGN.md                    # 设计说明（交付4）
-├─ ACCEPTANCE.md                # 验收记录（交付3，由 scenarios/run-all.js 输出佐证）
+├─ ACCEPTANCE.md                # 验收记录（交付3，由 tests/integration-test/run-all.js 与 tests/e2e-test/e2e-cli.js 输出佐证）
 ├─ CHANGELOG.md                 # 修改说明（交付1）
 ├─ AGENTS.md                    # AI 协作约定（回复语言/测试/git 规范）
 ├─ .gitignore                   # 忽略 data/ 等运行产物
@@ -235,7 +247,7 @@ bill/
 │  ├─ cli.js                    # CLI 入口：解析命令与 --user，分发到应用层
 │  ├─ config.js                 # 全局配置（DB 路径，可用 BILL_DB_PATH 覆盖）
 │  ├─ store/
-│  │  └─ jsonStore.js           # 单一 db.json 读写：临时文件 + rename 原子落盘
+│  │  └─ jsonStore.js           # db.json：MySQL 式关系表 ↔ 每用户视图 装配/回写 + 原子落盘
 │  ├─ domain/                   # 纯业务逻辑（无 I/O，可单测）
 │  │  ├─ money.js               # 金额工具（整数分，比较/汇总）
 │  │  ├─ simClock.js            # 每用户模拟时钟（set-now/advance）
@@ -261,15 +273,18 @@ bill/
 ├─ scripts/
 │  ├─ init-db.js                # init / reset / seed 数据库脚本
 │  └─ demo.js                   # 带旁白演示（正常/异常/核验/控制/诚实/重启）
-├─ scenarios/                   # 验收场景（预期/实际/PASS-FAIL）
-│  ├─ harness.js                # 场景运行工具（独立临时库、断言输出）
-│  ├─ scenario1.js .. scenario10.js   # 10 个验收场景
-│  └─ run-all.js                # 依次执行全部场景（npm run scenarios）
-├─ test/                        # 单元测试（node --test）
-│  ├─ helpers.js                # 测试辅助（临时库构造等）
-│  ├─ domain.test.js            # 配对/退款/提醒/金额等域逻辑
-│  ├─ scheduler.test.js         # 提醒调度规则
-│  └─ engine.test.js            # 引擎 tick 与幂等/中断恢复
+├─ tests/                       # 全部测试（三层，按类型分子目录）
+│  ├─ unit-test/                # 单元测试（npm test → node --test 自动发现 *.test.js）
+│  │  ├─ helpers.js             # 测试辅助（内存节点构造等）
+│  │  ├─ domain.test.js         # 配对/退款/提醒/金额等域逻辑
+│  │  ├─ scheduler.test.js      # 提醒调度规则
+│  │  └─ engine.test.js         # 引擎 tick 与幂等/中断恢复
+│  ├─ integration-test/         # 进程内验收/集成（npm run scenarios）
+│  │  ├─ harness.js             # 场景运行工具（独立临时库、断言输出）
+│  │  ├─ scenario1.js .. scenario10.js   # 10 个验收场景
+│  │  └─ run-all.js             # 依次执行全部场景
+│  └─ e2e-test/                 # 真·端到端（npm run e2e）
+│     └─ e2e-cli.js             # 逐条 spawn CLI 子进程复现 10 场景（零依赖 src/）
 ├─ fixtures/
 │  └─ sample.json               # 虚构样例事实（seed 数据源）
 └─ data/

@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planReminders } from '../src/domain/reminderScheduler.js';
-import { defaultUserNode } from '../src/store/jsonStore.js';
-import { beijingMs } from '../src/domain/simClock.js';
-import { REFUND_OVERDUE_MS, FOLLOWUP_INTERVAL_MS } from '../src/domain/rules.js';
+import { planReminders } from '../../src/domain/reminderScheduler.js';
+import { defaultUserNode } from '../../src/store/jsonStore.js';
+import { beijingMs } from '../../src/domain/simClock.js';
+import { REFUND_OVERDUE_MS, FOLLOWUP_INTERVAL_MS } from '../../src/domain/rules.js';
 
 const HOUR = 3600 * 1000;
 

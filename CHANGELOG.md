@@ -2,6 +2,33 @@
 
 本文件记录实现过程的里程碑与关键改动（交付1 的"修改说明"）。组件均为自研，**无第三方运行时依赖**（仅 Node 内置模块）。
 
+## v0.2.2 — 测试目录重组：`test/` + `scenarios/` → `tests/`（三层子目录）
+> 将全部测试按类型集中到 `tests/` 下三个子目录（`git mv` 保留历史）；业务代码（`src/`）零改动。
+- `tests/unit-test/`：原 `test/` 的 `helpers.js` + `domain/scheduler/engine.test.js`（`../src` → `../../src`）。
+- `tests/integration-test/`：原 `scenarios/` 的 `harness.js` + `scenario1..10.js` + `run-all.js`（仅 `harness.js` 的 `../src` → `../../src`；同目录内 `./harness.js`/`./scenarioN.js` 引用不变）。
+- `tests/e2e-test/e2e-cli.js`：原 `scenarios/e2e-cli.js`；因下沉一层，`new URL('..')` → `new URL('../..')` 以正确定位仓库根。
+- `package.json`：脚本改指新路径；新增与子目录同名的 `unit-test`/`integration-test`/`e2e-test`（保留 `scenarios`/`e2e` 别名）。
+- 计数修正：单元用例真实为 **24**（旧 `node --test` 报 25 是因为 `test/` 目录名命中 `**/test/**` 规则、将无 `test()` 的 `helpers.js` 多计 1 项；迁入 `unit-test/` 后不再误计）。未丢失任何用例（与 HEAD 逐文件核对：domain 9 + scheduler 8 + engine 7 = 24）。
+- 文档同步：`README.md`、`ACCEPTANCE.md`、`DESIGN.md`、`specs/spec.md` 中的 `test/`与`scenarios/` 路径均更新为 `tests/*`。
+- **验证**：`node --test` 24/24、`node tests/integration-test/run-all.js` 10/10(42/42)、`node tests/e2e-test/e2e-cli.js` 10/10(37/37) 均退出码 0。
+
+## v0.2.1 — 新增 CLI 端到端验收（`scenarios/e2e-cli.js`）
+> 在既有三层测试（单测 / 进程内验收）基础上补齐**真·端到端**：逐条 `spawn` 独立 `node src/cli.js` 子进程复现 10 个验收场景。
+- `scenarios/e2e-cli.js`：用 `child_process.execFileSync` 逐条驱动真实 CLI（每命令一个独立进程），写入独立临时库（`BILL_DB_PATH` 指向 `os.tmpdir()`），逐场景 `reset` + 独立 `u1…u10`；输出与 `run-all.js` 同款「输入/预期/证据/✓✗ + PASS-FAIL 汇总」，任一失败非零退出；`finally` 清理临时库。
+- **零依赖 `src/`**：断言助手 `check()` 内联（不再 `import` `harness.js`），`e2e-cli.js` 仅 `import` Node 内置模块（`node:child_process/os/path/fs/url`）——只要 CLI 输入/输出契约不变，业务模块重构不牵连本 e2e 套件。
+- `package.json`：新增脚本 `"e2e": "node scenarios/e2e-cli.js"`。
+- 文档同步：`README.md`（新增“测试分层”表与 `npm run e2e`）、`ACCEPTANCE.md`（新增端到端证据层）。
+- **验证**：`node scenarios/e2e-cli.js` → 10/10 场景、37/37 断言通过（退出码 0）。
+
+## v0.2.0 — 存储改为 MySQL 式关系表（仍用单一 `db.json`）
+> 将 `data/db.json` 由文档式（`{version, users:{<userId>:<节点>}}`）改为**结构化关系表**，业务逻辑（domain/repo/app/engine）保持不变。
+- `src/store/jsonStore.js`：顶层改为 `{version:2, tables:{<表名>:[行…]}}`；新增表清单 `TABLES` 与 `emptyDb`；`loadScoped`/`saveScoped` 完成 **关系表 ↔ 每用户视图** 的双向装配/整组回写，多对多规范化到关联表 `issue_txs`/`issue_links`；`controls`/`clocks` 每用户一行；`clearUser` 供测试重建干净视图；`normalizeToTables` + `migrateV1toV2` 自动兼容旧 `version:1` 文档结构。
+- `src/cli.js`：`init/reset` 改用 `emptyDb()`，不再依赖 `ensureUserNode`。
+- `scripts/init-db.js`：`seed` 写入关系表（`ensureUser` + `saveScoped`）。
+- `scenarios/harness.js`：改为 `store.clearUser(userId)` 重建干净视图，保证场景可重放、互不串扰。
+- `specs/spec.md`、`README.md`、`DESIGN.md` 数据模型描述同步更新为关系表。
+- **验证**：10/10 场景、42/42 断言、`node --test` 25/25、CLI 写盘与 junction 表（`issue_txs`/`issue_links`）回环均通过。
+
 ## v0.1.0 — 首个完整可运行版本（T1–T13）
 
 ### T1 脚手架与持久化
@@ -54,7 +81,7 @@
 - `README.md`(交付2)、`DESIGN.md`(交付4)、`ACCEPTANCE.md`(交付3)、`CHANGELOG.md`(交付1)、`fixtures/sample.json`(虚构样例+范围声明)、`scripts/demo.js`(交付5)。
 
 ## 过程中的关键修正
-- **持久化方案**：SQLite → JSON 文件 → **单一 `data/db.json`（按 userId 分组）**，并提供 `init/reset/seed` 脚本保证可重复测试。
+- **持久化方案**：SQLite → JSON 文件 → 单一 `data/db.json`（按 userId 分组）→ **MySQL 式关系表（行带 `user_id` 外键 + 关联表）**，仍以单一 `db.json` 存储；提供 `init/reset/seed` 脚本与旧文档结构自动迁移，保证可重复测试。
 - **交付6**：不再维护 `ai-history.txt`，改由 Qoder 会话历史导出满足。
 - **场景可重复性**：`harness` 构造函数每次以 `defaultUserNode` 重建干净用户节点，避免临时库跨次累积导致重放误判。
 - **场景4 断言取快照**：部分到账后的 `received_cents` 以原始值即时快照，避免同一对象引用被后续全额到账覆盖导致误判。
@@ -62,6 +89,7 @@
 
 ## 验证状态
 - `node scenarios/run-all.js`：10/10 场景、42/42 断言通过（退出码 0）。
+- `node scenarios/e2e-cli.js`：10/10 场景、37/37 断言通过（真·CLI 子进程，退出码 0）。
 - `node --test`：25/25 通过。
 - `node scripts/demo.js`：正常/核验/退款/控制/诚实/重启全流程按预期输出。
 - `node src/cli.js`（init→seed→advance→list/report）冒烟通过。
