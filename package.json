@@ -1,0 +1,19 @@
+{
+  "name": "bill-followup",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "模拟账单疑似重复扣款/退款逾期跟进系统（CLI + 可重放验收场景，无第三方运行时依赖）",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "cli": "node src/cli.js",
+    "init": "node scripts/init-db.js init",
+    "reset": "node scripts/init-db.js reset",
+    "seed": "node scripts/init-db.js seed",
+    "scenarios": "node scenarios/run-all.js",
+    "demo": "node scripts/demo.js"
+  }
+}

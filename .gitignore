@@ -1,0 +1,6 @@
+node_modules/
+*.log
+.DS_Store
+
+# 运行时数据库（单一 db.json，存放所有用户，属模拟运行产物，不入库）
+data/
