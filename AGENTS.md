@@ -3,7 +3,8 @@
 - Keep answers concise and direct; technical terms and code identifiers stay in their original form.
 
 # Test
-- 为新写或改动的逻辑编写测试，但保持聚焦 —— 不要让测试套件过于臃肿。
-- 优先少量有价值的用例（主路径 + 关键边界情况），而非穷举式全覆盖。
+- Write tests for new or changed logic, but keep them focused — do NOT make the test suite overwhelming.
+- Prefer a few meaningful cases (happy path + key edge cases) over exhaustive coverage.
 
-
+# git
+- commit to main branch directly
