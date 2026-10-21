@@ -16,7 +16,7 @@
 | 交付2 运行说明 | 本 `README.md` |
 | 交付3 验收记录 | `docs/ACCEPTANCE.md`（由 `tests/integration-test/run-all.js` 与 `tests/e2e-test/e2e-cli.js` 输出佐证） |
 | 交付4 设计说明 | `docs/DESIGN.md`（+ `specs/spec.md` 规格定稿） |
-| 交付5 演示 | `npm run e2e` （真·端到端，逐条 spawn CLI 子进程跑完 10 场景） |
+| 交付5 演示 | demo.mp4 (`npm run e2e` - 真·端到端，逐条 spawn CLI 子进程跑完 10 场景） |
 | 交付6 AI 协作记录 | 子目录：`ai-conversation-history` |
 
 ## 环境要求
